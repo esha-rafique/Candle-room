@@ -1,0 +1,406 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+#wrap{position:relative;width:100%;height:560px;background:#050301;overflow:hidden;border-radius:12px;font-family:'Palatino Linotype',Palatino,Georgia,serif;cursor:grab;user-select:none}
+#wrap.grabbing{cursor:grabbing}
+#cv{position:absolute;top:0;left:0;display:block}
+#rtitle{position:absolute;top:14px;left:18px;color:rgba(235,200,135,.2);font-size:12px;font-style:italic;letter-spacing:.14em;pointer-events:none;z-index:2}
+#ccount{position:absolute;top:14px;right:18px;color:rgba(235,200,135,.2);font-size:12px;font-style:italic;pointer-events:none;z-index:2}
+#hint{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);color:rgba(235,200,135,.28);font-size:12px;font-style:italic;letter-spacing:.06em;white-space:nowrap;pointer-events:none;z-index:2;transition:opacity .5s}
+#tooltip{position:absolute;pointer-events:none;z-index:10;opacity:0;transition:opacity .2s;transform:translateX(-50%);text-align:center}
+#tooltip-inner{display:inline-block;background:rgba(8,5,2,.94);border:1px solid rgba(225,135,30,.2);border-radius:8px;padding:7px 14px;color:rgba(240,195,120,.92);font-size:13px;font-style:italic;letter-spacing:.03em;white-space:nowrap}
+#tooltip-inner span{display:block;font-size:11px;color:rgba(235,200,135,.35);margin-top:2px;letter-spacing:.05em}
+#selui{position:absolute;bottom:46px;left:50%;transform:translateX(-50%);display:none;flex-direction:column;align-items:center;gap:7px;z-index:5}
+#sellabel{color:rgba(235,200,135,.35);font-size:11px;font-style:italic;letter-spacing:.06em;text-align:center;line-height:1.7}
+#lightbtn{background:rgba(175,75,8,.13);border:1px solid rgba(225,135,30,.3);color:rgba(240,185,100,.9);padding:9px 24px;border-radius:30px;font-family:inherit;font-size:13px;font-style:italic;cursor:pointer;letter-spacing:.04em;transition:all .2s}
+#lightbtn:hover{background:rgba(175,75,8,.26);color:rgba(255,212,140,1);border-color:rgba(225,135,30,.6)}
+#backbtn{background:none;border:none;color:rgba(235,200,135,.22);font-family:inherit;font-size:11px;font-style:italic;cursor:pointer;letter-spacing:.04em;transition:color .2s}
+#backbtn:hover{color:rgba(235,200,135,.5)}
+#mbg{position:absolute;inset:0;background:rgba(2,1,0,.9);display:none;align-items:center;justify-content:center;z-index:20}
+#mbox{background:#0B0703;border:1px solid rgba(225,135,30,.16);border-radius:16px;padding:32px 28px;max-width:290px;width:calc(100% - 40px);text-align:center}
+#mbox h3{color:rgba(235,200,135,.9);font-size:18px;font-weight:400;font-style:italic;margin-bottom:8px}
+#mbox p{color:rgba(235,200,135,.28);font-size:13px;margin-bottom:20px;line-height:1.68;font-style:italic}
+#ninp{width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(225,135,30,.2);border-radius:8px;color:rgba(235,200,135,.92);font-family:inherit;font-style:italic;font-size:15px;padding:11px 14px;text-align:center;outline:none;margin-bottom:12px;transition:border-color .2s;display:block}
+#ninp::placeholder{color:rgba(235,200,135,.18)}
+#ninp:focus{border-color:rgba(225,135,30,.52)}
+#cbtn{width:100%;background:rgba(175,75,8,.12);border:1px solid rgba(225,135,30,.28);color:rgba(238,182,95,.9);font-family:inherit;font-style:italic;font-size:14px;padding:11px;border-radius:8px;cursor:pointer;margin-bottom:9px;letter-spacing:.04em;transition:all .2s;display:block}
+#cbtn:hover{background:rgba(175,75,8,.24)}
+#xcbtn{background:none;border:none;color:rgba(235,200,135,.22);font-family:inherit;font-style:italic;font-size:11px;cursor:pointer;letter-spacing:.04em;display:block;width:100%;text-align:center}
+#xcbtn:hover{color:rgba(235,200,135,.5)}
+#ldr{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#050301;color:rgba(235,200,135,.18);font-size:14px;font-style:italic;letter-spacing:.08em;z-index:30;pointer-events:none;transition:opacity .9s}
+</style>
+
+<div id="wrap">
+  <canvas id="cv"></canvas>
+  <span id="rtitle">The Candle Room</span>
+  <span id="ccount"></span>
+  <div id="hint">drag to look around · click a table to place a candle · hover a candle to read it</div>
+  <div id="tooltip"><div id="tooltip-inner">name<span>touching the light</span></div></div>
+  <div id="selui">
+    <span id="sellabel"></span>
+    <button id="lightbtn">light a candle here</button>
+    <button id="backbtn">← look around</button>
+  </div>
+  <div id="mbg">
+    <div id="mbox">
+      <h3>Who is this candle for?</h3>
+      <p>A name. A memory.<br>Someone you're thinking of tonight.</p>
+      <input id="ninp" type="text" placeholder="their name…" maxlength="40">
+      <button id="cbtn">Light the candle</button>
+      <button id="xcbtn">never mind</button>
+    </div>
+  </div>
+  <div id="ldr">the room is waking up…</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const SKEY='cr3dv4',MAX_AGE=259200000;
+const wrap=document.getElementById('wrap');
+const W=wrap.offsetWidth||640,H=560;
+const tooltip=document.getElementById('tooltip');
+const tooltipInner=document.getElementById('tooltip-inner');
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x050301);
+scene.fog=new THREE.FogExp2(0x050301,0.042);
+
+const cam=new THREE.PerspectiveCamera(68,W/H,0.05,30);
+cam.position.set(0,1.72,2.8);
+
+const renderer=new THREE.WebGLRenderer({canvas:document.getElementById('cv'),antialias:true});
+renderer.setSize(W,H);
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputEncoding=THREE.sRGBEncoding;
+renderer.toneMapping=THREE.ReinhardToneMapping;
+renderer.toneMappingExposure=2.2;
+
+scene.add(new THREE.AmbientLight(0xFF5500,0.055));
+const ceilLt=new THREE.PointLight(0xFF8820,0.48,22);
+ceilLt.position.set(0,4.8,0);ceilLt.castShadow=true;scene.add(ceilLt);
+
+const lampM=new THREE.MeshLambertMaterial({color:0x3A1E08});
+const lamp=new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.18,0.14,12),lampM);
+lamp.position.set(0,4.66,0);scene.add(lamp);
+const lampChain=new THREE.Mesh(new THREE.CylinderGeometry(0.015,0.015,0.35,6),lampM);
+lampChain.position.set(0,4.83,0);scene.add(lampChain);
+
+const fMat=new THREE.MeshLambertMaterial({color:0x160B03});
+const wMat=new THREE.MeshLambertMaterial({color:0x0C0703});
+const cMat=new THREE.MeshLambertMaterial({color:0x070402});
+const fl=new THREE.Mesh(new THREE.PlaneGeometry(22,22),fMat);
+fl.rotation.x=-Math.PI/2;fl.receiveShadow=true;scene.add(fl);
+const cl=new THREE.Mesh(new THREE.PlaneGeometry(22,22),cMat);
+cl.rotation.x=Math.PI/2;cl.position.y=5;scene.add(cl);
+
+[{p:[0,2.5,-11],r:[0,0,0]},{p:[0,2.5,11],r:[0,Math.PI,0]},{p:[-11,2.5,0],r:[0,Math.PI/2,0]},{p:[11,2.5,0],r:[0,-Math.PI/2,0]}].forEach(w=>{
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(22,5),wMat);
+  m.position.set(...w.p);m.rotation.set(...w.r);m.receiveShadow=true;scene.add(m);
+});
+const pnlM=new THREE.MeshLambertMaterial({color:0x1E0E05});
+[{p:[0,0.55,-10.94],s:[22,1.1,0.06]},{p:[0,0.55,10.94],s:[22,1.1,0.06]},{p:[-10.94,0.55,0],s:[0.06,1.1,22]},{p:[10.94,0.55,0],s:[0.06,1.1,22]}].forEach(b=>{
+  const m=new THREE.Mesh(new THREE.BoxGeometry(...b.s),pnlM);
+  m.position.set(...b.p);scene.add(m);
+});
+
+const scnM=new THREE.MeshLambertMaterial({color:0x3E1E08});
+[[-9.8,2.7,-6],[9.8,2.7,-6],[-9.8,2.7,4],[9.8,2.7,4],[0,2.7,-10.8]].forEach(p=>{
+  const sc=new THREE.Mesh(new THREE.BoxGeometry(0.15,0.22,0.09),scnM);
+  sc.position.set(...p);scene.add(sc);
+  const sl=new THREE.PointLight(0xFF8020,0.2,5.5);
+  const ox=p[0]>0?-0.45:p[0]<0?0.45:0,oz=p[2]>0?-0.45:0.45;
+  sl.position.set(p[0]+ox,p[1]-0.1,p[2]+oz);scene.add(sl);
+});
+
+const tDefs=[
+  {x:0,z:-8,l:'the back table'},
+  {x:6.8,z:-4.5,l:'the corner table'},
+  {x:-6.8,z:-4.5,l:'the alcove table'},
+  {x:7.5,z:2.5,l:'the east table'},
+  {x:-7.5,z:2.5,l:'the west table'},
+];
+const tableGroups=[],tableTops=[];
+
+// All candle bodies for raycasting
+const candleMeshes=[];
+
+const wdM=new THREE.MeshLambertMaterial({color:0x3C1E08});
+const lgM=new THREE.MeshLambertMaterial({color:0x261304});
+
+tDefs.forEach((td,i)=>{
+  const g=new THREE.Group();
+  g.position.set(td.x,0,td.z);
+  const top=new THREE.Mesh(new THREE.BoxGeometry(1.96,0.09,1.12),wdM.clone());
+  top.position.y=0.88;top.castShadow=true;top.receiveShadow=true;
+  top.userData={ti:i};g.add(top);
+  const apron=new THREE.Mesh(new THREE.BoxGeometry(1.78,0.06,0.94),new THREE.MeshLambertMaterial({color:0x2E1506}));
+  apron.position.y=0.81;g.add(apron);
+  [[-0.9,-0.51],[0.9,-0.51],[-0.9,0.51],[0.9,0.51]].forEach(([lx,lz])=>{
+    const leg=new THREE.Mesh(new THREE.BoxGeometry(0.07,0.84,0.07),lgM);
+    leg.position.set(lx,0.42,lz);leg.castShadow=true;g.add(leg);
+    const foot=new THREE.Mesh(new THREE.BoxGeometry(0.1,0.04,0.1),lgM);
+    foot.position.set(lx,0.02,lz);g.add(foot);
+  });
+  const str=new THREE.Mesh(new THREE.BoxGeometry(1.7,0.04,0.04),lgM);
+  str.position.y=0.22;g.add(str);
+  g.userData={i,l:td.l,candles:[]};
+  tableGroups.push(g);tableTops.push(top);scene.add(g);
+});
+
+let ltCount=0;
+function addCandle(ti,name,sx,sz,created){
+  if(ti<0||ti>=tableGroups.length)return;
+  const tg=tableGroups[ti];
+  const h=0.18+Math.random()*0.15;
+  const cg=new THREE.Group();
+  cg.position.set(sx,0.926+h/2,sz);
+
+  const bodyMat=new THREE.MeshLambertMaterial({
+    color:new THREE.Color().setHSL(0.1,0.18,0.82+Math.random()*0.1)
+  });
+  const body=new THREE.Mesh(new THREE.CylinderGeometry(0.031,0.045,h,8),bodyMat);
+  body.castShadow=true;
+  // Store name on the body mesh for raycasting
+  body.userData={isCandle:true,name,created};
+  cg.add(body);
+  candleMeshes.push(body);
+
+  if(Math.random()>.5){
+    const drip=new THREE.Mesh(new THREE.SphereGeometry(0.018,5,4),new THREE.MeshLambertMaterial({color:0xD8C49A}));
+    drip.position.set(0.03,-h*0.1,0.01);drip.scale.y=1.6;cg.add(drip);
+  }
+  const wick=new THREE.Mesh(new THREE.CylinderGeometry(0.003,0.003,0.025,5),new THREE.MeshLambertMaterial({color:0x1A0C03}));
+  wick.position.y=h/2+0.01;cg.add(wick);
+
+  const flame=new THREE.Mesh(
+    new THREE.SphereGeometry(0.022,6,5),
+    new THREE.MeshBasicMaterial({color:0xFFAA30})
+  );
+  flame.position.y=h/2+0.048;flame.scale.y=2.3;
+  // Flame also raycasts to name
+  flame.userData={isCandle:true,name,created};
+  cg.add(flame);
+  candleMeshes.push(flame);
+
+  const core=new THREE.Mesh(
+    new THREE.SphereGeometry(0.009,5,4),
+    new THREE.MeshBasicMaterial({color:0xFFFFAA})
+  );
+  core.position.y=h/2+0.042;cg.add(core);
+
+  if(ltCount<11){
+    const pl=new THREE.PointLight(0xFF8020,0.7,3);
+    pl.position.y=h/2+0.14;cg.add(pl);ltCount++;
+  }
+  tg.add(cg);
+  tg.userData.candles.push({name,created:created||Date.now(),sx,sz,flame,core});
+  return cg;
+}
+
+// Camera state
+let yaw=0,pitch=-0.07;
+let isDrag=false,dragMoved=false,lmx=0,lmy=0,smx=0,smy=0;
+let camTX=0,camTZ=2.8,camCX=0,camCZ=2.8;
+let selTable=null,hovTable=null;
+let hovCandle=null;
+const rc=new THREE.Raycaster();
+rc.params.Points={threshold:0.1};
+
+function getMouseNDC(cx,cy){
+  const r=wrap.getBoundingClientRect();
+  return {x:((cx-r.left)/W)*2-1,y:-((cy-r.top)/H)*2+1,rx:cx-r.left,ry:cy-r.top};
+}
+
+function showTooltip(name,created,screenX,screenY){
+  const age=Math.floor((Date.now()-created)/3600000);
+  const ageStr=age<1?'just now':age===1?'1 hour ago':age<24?`${age} hours ago`:age<48?'yesterday':`${Math.floor(age/24)} days ago`;
+  tooltipInner.innerHTML=`for <strong style="color:rgba(255,210,140,.95);font-weight:500">${name}</strong><span>lit ${ageStr}</span>`;
+  tooltip.style.left=screenX+'px';
+  tooltip.style.top=(screenY-52)+'px';
+  tooltip.style.opacity='1';
+  hovCandle=name;
+}
+function hideTooltip(){tooltip.style.opacity='0';hovCandle=null;}
+
+function project3DToScreen(obj){
+  const pos=new THREE.Vector3();
+  obj.getWorldPosition(pos);
+  pos.project(cam);
+  return {x:(pos.x*.5+.5)*W,y:(-.5*pos.y+.5)*H};
+}
+
+function doHover(cx,cy){
+  if(isDrag)return;
+  const {x,y,rx,ry}=getMouseNDC(cx,cy);
+  rc.setFromCamera({x,y},cam);
+
+  // Check candles first
+  const cHits=rc.intersectObjects(candleMeshes);
+  if(cHits.length){
+    const hit=cHits[0].object;
+    if(hit.userData.isCandle){
+      showTooltip(hit.userData.name,hit.userData.created,rx,ry);
+      wrap.style.cursor='pointer';
+      // Also update table hover
+      if(hovTable!==null&&hovTable!==selTable){tableTops[hovTable].material.emissive.setHex(0);hovTable=null;}
+      return;
+    }
+  }
+  hideTooltip();
+
+  // Check tables
+  const hits=rc.intersectObjects(tableTops);
+  if(hits.length){
+    const idx=hits[0].object.userData.ti;
+    if(hovTable!==idx){
+      if(hovTable!==null&&hovTable!==selTable)tableTops[hovTable].material.emissive.setHex(0);
+      hovTable=idx;
+      if(idx!==selTable)tableTops[idx].material.emissive.setHex(0x100500);
+    }
+    wrap.style.cursor='pointer';
+  } else {
+    if(hovTable!==null&&hovTable!==selTable){tableTops[hovTable].material.emissive.setHex(0);hovTable=null;}
+    wrap.style.cursor=isDrag?'grabbing':'grab';
+  }
+}
+
+function doClick(cx,cy){
+  const {x,y}=getMouseNDC(cx,cy);
+  rc.setFromCamera({x,y},cam);
+  const cHits=rc.intersectObjects(candleMeshes);
+  if(cHits.length&&cHits[0].object.userData.isCandle)return; // clicked candle, just tooltip
+  const hits=rc.intersectObjects(tableTops);
+  if(hits.length) selectTable(hits[0].object.userData.ti);
+  else deselectTable();
+}
+
+function viewTable(idx){
+  const td=tDefs[idx];
+  const dx=-td.x,dz=-td.z,len=Math.sqrt(dx*dx+dz*dz)||1;
+  camTX=td.x+(dx/len)*3.2;camTZ=td.z+(dz/len)*3.2;
+  yaw=Math.atan2(td.x-camTX,-(td.z-camTZ));pitch=-0.1;
+}
+function selectTable(idx){
+  if(selTable!==null&&selTable!==idx)tableTops[selTable].material.emissive.setHex(0);
+  selTable=idx;
+  tableTops[idx].material.emissive.setHex(0x1E0A00);
+  viewTable(idx);
+  const cnt=tableGroups[idx].userData.candles.length;
+  document.getElementById('sellabel').textContent=tDefs[idx].l+(cnt>0?` · ${cnt} candle${cnt>1?'s':''} burning`:'· no candles yet');
+  document.getElementById('selui').style.display='flex';
+  document.getElementById('hint').style.opacity='0';
+}
+function deselectTable(){
+  if(selTable!==null){tableTops[selTable].material.emissive.setHex(0);selTable=null;}
+  if(hovTable!==null){tableTops[hovTable].material.emissive.setHex(0);hovTable=null;}
+  document.getElementById('selui').style.display='none';
+  document.getElementById('hint').style.opacity='1';
+}
+function isUI(el){return el&&el.closest&&el.closest('#selui,#mbg')}
+
+wrap.addEventListener('mousedown',e=>{if(isUI(e.target))return;isDrag=true;dragMoved=false;lmx=smx=e.clientX;lmy=smy=e.clientY;wrap.classList.add('grabbing');});
+window.addEventListener('mousemove',e=>{
+  if(isDrag){
+    yaw-=(e.clientX-lmx)*0.0038;pitch-=(e.clientY-lmy)*0.0024;
+    pitch=Math.max(-0.55,Math.min(0.55,pitch));lmx=e.clientX;lmy=e.clientY;
+    if(Math.abs(e.clientX-smx)>4||Math.abs(e.clientY-smy)>4)dragMoved=true;
+    hideTooltip();
+  } else doHover(e.clientX,e.clientY);
+});
+window.addEventListener('mouseup',e=>{
+  if(isDrag&&!dragMoved&&!isUI(e.target))doClick(e.clientX,e.clientY);
+  isDrag=false;wrap.classList.remove('grabbing');wrap.style.cursor='grab';
+});
+wrap.addEventListener('touchstart',e=>{if(isUI(e.target))return;const t=e.touches[0];isDrag=true;dragMoved=false;lmx=smx=t.clientX;lmy=smy=t.clientY;},{passive:true});
+wrap.addEventListener('touchmove',e=>{if(!isDrag)return;const t=e.touches[0];yaw-=(t.clientX-lmx)*0.004;pitch-=(t.clientY-lmy)*0.003;pitch=Math.max(-0.5,Math.min(0.5,pitch));lmx=t.clientX;lmy=t.clientY;if(Math.abs(t.clientX-smx)>4||Math.abs(t.clientY-smy)>4)dragMoved=true;},{passive:true});
+wrap.addEventListener('touchend',e=>{if(isDrag&&!dragMoved&&!isUI(e.target)){const t=e.changedTouches[0];doClick(t.clientX,t.clientY);}isDrag=false;});
+
+// Long press on mobile to show tooltip
+let longPressTimer=null;
+wrap.addEventListener('touchstart',e=>{
+  const t=e.touches[0];
+  longPressTimer=setTimeout(()=>{
+    const{x,y,rx,ry}=getMouseNDC(t.clientX,t.clientY);
+    rc.setFromCamera({x,y},cam);
+    const hits=rc.intersectObjects(candleMeshes);
+    if(hits.length&&hits[0].object.userData.isCandle){
+      showTooltip(hits[0].object.userData.name,hits[0].object.userData.created,rx,ry);
+    }
+  },400);
+},{passive:true});
+wrap.addEventListener('touchend',()=>{clearTimeout(longPressTimer);setTimeout(hideTooltip,1800);});
+
+document.getElementById('lightbtn').addEventListener('click',()=>{
+  document.getElementById('mbg').style.display='flex';
+  setTimeout(()=>document.getElementById('ninp').focus(),60);
+});
+document.getElementById('backbtn').addEventListener('click',deselectTable);
+document.getElementById('xcbtn').addEventListener('click',closeM);
+function closeM(){document.getElementById('mbg').style.display='none';document.getElementById('ninp').value='';}
+
+document.getElementById('cbtn').addEventListener('click',async()=>{
+  const name=document.getElementById('ninp').value.trim();
+  if(!name){
+    const el=document.getElementById('ninp');
+    el.style.borderColor='rgba(255,60,30,.5)';setTimeout(()=>el.style.borderColor='',700);return;
+  }
+  if(selTable===null)return;
+  const ti=selTable,cnt=tableGroups[ti].userData.candles.length;
+  const COLS=5,col=cnt%COLS,row=Math.floor(cnt/COLS);
+  const sx=(col-(COLS-1)/2)*0.34,sz=(row-0.5)*0.28;
+  addCandle(ti,name,sx,sz,Date.now());
+  await save();updateCount();closeM();
+  const c2=tableGroups[ti].userData.candles.length;
+  document.getElementById('sellabel').textContent=tDefs[ti].l+` · ${c2} candle${c2>1?'s':''} burning`;
+});
+document.getElementById('ninp').addEventListener('keydown',e=>{
+  if(e.key==='Enter')document.getElementById('cbtn').click();
+  if(e.key==='Escape')closeM();
+});
+
+async function save(){
+  const all=[],now=Date.now();
+  tableGroups.forEach((tg,ti)=>tg.userData.candles.forEach(c=>{
+    if((now-c.created)<MAX_AGE)all.push({ti,name:c.name,created:c.created,sx:c.sx,sz:c.sz});
+  }));
+  try{await window.storage.set(SKEY,JSON.stringify(all),true);}catch(e){}
+}
+async function load(){
+  try{
+    const res=await window.storage.get(SKEY,true);
+    if(res?.value){
+      const now=Date.now();
+      JSON.parse(res.value).filter(c=>(now-c.created)<MAX_AGE).forEach(c=>addCandle(c.ti,c.name,c.sx,c.sz,c.created));
+    }
+  }catch(e){}
+  const ldr=document.getElementById('ldr');
+  ldr.style.opacity='0';setTimeout(()=>ldr.style.display='none',900);
+  updateCount();
+}
+function updateCount(){
+  let n=0;tableGroups.forEach(tg=>n+=tg.userData.candles.length);
+  document.getElementById('ccount').textContent=n?(n===1?'1 candle burning':`${n} candles burning`):'';
+}
+
+let T=0;
+function animate(){
+  requestAnimationFrame(animate);T+=0.016;
+  camCX+=(camTX-camCX)*0.055;camCZ+=(camTZ-camCZ)*0.055;
+  cam.position.set(camCX,1.72,camCZ);
+  const cx=Math.sin(yaw)*Math.cos(pitch),cy=Math.sin(pitch),cz=-Math.cos(yaw)*Math.cos(pitch);
+  cam.lookAt(camCX+cx*8,1.72+cy*8,camCZ+cz*8);
+  tableGroups.forEach((tg,ti)=>tg.userData.candles.forEach((c,ci)=>{
+    if(!c.flame)return;
+    const f1=Math.sin(T*9.1+ti*3.7+ci*2.3),f2=Math.sin(T*14.3+ti*2.1+ci*5.7);
+    const fl=1+f1*0.11+f2*0.07;
+    c.flame.scale.set(fl,2.3*fl,fl);
+    c.flame.material.color.setHSL(0.073+f1*0.018,1,0.5+f2*0.1);
+    if(c.core)c.core.material.color.setHSL(0.13,0.7,0.88+f1*0.06);
+  }));
+  ceilLt.intensity=0.48+Math.sin(T*0.53)*0.03;
+  renderer.render(scene,cam);
+}
+load().then(()=>animate());
+</script>
