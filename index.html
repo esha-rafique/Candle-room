@@ -121,7 +121,7 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 // ══════════════════════════════════════════════════════
 
 const MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
-const useDB = SUPABASE_URL !== 'https://egyjbxbumoelhhioqiid.supabase.co';
+const useDB = true;
 const sb = useDB ? supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
 const wrap = document.getElementById('wrap');
